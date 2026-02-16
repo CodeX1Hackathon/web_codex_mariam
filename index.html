@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recycle Boost Egypt</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<style>
+body{
+  margin:0;
+  font-family:Segoe UI, sans-serif;
+  min-height:100vh;
+  background:#000;
+  overflow:hidden;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+canvas#bgCanvas{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  z-index:-1;
+}
+
+.card{
+  max-width:600px;
+  width:90%;
+  padding:30px;
+  border-radius:20px;
+  box-shadow:0 0 25px #39ff14;
+  text-align:center;
+  color:white;
+  background:#111;
+  margin:0;
+}
+
+h1{ color:#39ff14; margin-bottom:10px; }
+p{ color:#ccc; }
+
+button{
+  width:100%;
+  padding:12px;
+  margin:10px 0;
+  border:none;
+  border-radius:12px;
+  background:#39ff14;
+  color:black;
+  font-size:16px;
+  cursor:pointer;
+  transition:0.3s;
+  font-weight:bold;
+}
+button:hover{
+  background:white;
+  transform:scale(1.05);
+}
+
+input,select{
+  width:100%;
+  padding:10px;
+  margin:8px 0;
+  border-radius:10px;
+  border:1px solid #39ff14;
+  background:#000;
+  color:white;
+}
+input:focus,select:focus{
+  outline:none;
+  box-shadow:0 0 10px #39ff14;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+  font-size:14px;
+  color:white;
+}
+th{ color:#39ff14; }
+th,td{ padding:8px; border-bottom:1px solid #333; }
+img{ width:60px; height:60px; border-radius:8px; object-fit:cover; }
+
+#map{ height:250px; margin:10px 0; border-radius:10px; } 
+.hidden{ display:none; }
+.success{ color:#39ff14; font-weight:bold; margin-top:10px; } 
+.delete-btn{ background:red; color:white; }
+
+/* ---------------- Admin Card Bigger ---------------- */
+#adminPage.card{
+  width:90%;
+  max-width:900px;
+  padding:30px;
+  border-radius:20px;
+  box-shadow:0 0 25px #39ff14;
+  text-align:center;
+  color:white;
+  background:#111;
+  margin:0;
+  max-height:90vh;
+  height:auto;
+  overflow-y:auto;
+}
+</style>
+</head>
+
+<body>
+<canvas id="bgCanvas"></canvas>
+
+<!-- LANDING -->
+<div class="card" id="landing">
+  <h1>♻ Recycle Boost Egypt</h1>
+  <p>Turn Waste Into Cash & Help The Environment</p>
+  <button onclick="goUser()">I am a User</button>
+  <button onclick="goCompany()">I am a Company</button>
+  <button onclick="goAdmin()">I am an Admin</button>
+</div>
+
+<!-- USER PAGE -->
+<div class="card hidden" id="userPage">
+  <h1>User Panel</h1>
+  <input type="text" id="username" placeholder="Your Name">
+  <input type="email" id="userEmail" placeholder="Email">
+  <select id="type">
+    <option value="">-- Select Type --</option>
+    <option value="plastic">Plastic (20 EGP)</option>
+    <option value="glass">Glass (10 EGP)</option>
+    <option value="metal">Metal / Can (125 EGP)</option>
+    <option value="paper">Paper (8 EGP)</option>
+  </select>
+  <input type="number" id="weight" placeholder="Weight (KG)">
+  <input type="tel" id="phone" placeholder="Phone">
+  <input type="file" id="image" accept="image/*">
+  <div id="map"></div>
+  <button onclick="locateMe()">Locate Me</button>
+  <button onclick="submitWaste()">Submit</button>
+  <p id="result" class="success"></p>
+  <button onclick="backHome()">Back</button>
+</div>
+
+<!-- COMPANY LOGIN -->
+<div class="card hidden" id="companyLogin">
+  <h1>Company Login</h1>
+  <input type="password" id="companyPass" placeholder="Password">
+  <button onclick="checkCompany()">Login</button>
+  <button onclick="backHome()">Back</button>
+</div>
+
+<!-- COMPANY DASHBOARD -->
+<div class="card hidden" id="companyPage">
+  <h1>Company Dashboard</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Total KG</th>
+        <th>Value (EGP)</th>
+      </tr>
+    </thead>
+    <tbody id="companyTable"></tbody>
+  </table>
+  <button onclick="logout()">Logout</button>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div class="card hidden" id="adminLogin">
+  <h1>Admin Login</h1>
+  <input type="password" id="adminPass" placeholder="Password">
+  <button onclick="checkAdmin()">Login</button>
+  <button onclick="backHome()">Back</button>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div class="card hidden" id="adminPage">
+  <h1>Admin Dashboard</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Type</th>
+        <th>Weight</th>
+        <th>Commission</th>
+        <th>Points</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="adminTable"></tbody>
+  </table>
+  <button onclick="logout()">Logout</button>
+</div>
+
+<input type="hidden" id="latitude">
+<input type="hidden" id="longitude">
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
+function backHome(){ hideAll(); landing.classList.remove("hidden"); }
+function goUser(){ hideAll(); userPage.classList.remove("hidden"); }
+function goCompany(){ hideAll(); companyLogin.classList.remove("hidden"); }
+function goAdmin(){ hideAll(); adminLogin.classList.remove("hidden"); }
+
+function getPrice(type){ const prices={plastic:20,glass:10,metal:125,paper:8}; return prices[type]||0; }
+
+// Map
+var map=L.map('map').setView([30.0444,31.2357],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+var marker;
+function locateMe(){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    let lat=pos.coords.latitude, lng=pos.coords.longitude;
+    map.setView([lat,lng],15);
+    if(marker){ marker.setLatLng([lat,lng]); } else { marker=L.marker([lat,lng]).addTo(map); }
+    latitude.value=lat; longitude.value=lng;
+  });
+}
+
+// Submit user waste with points
+function submitWaste(){
+  let name=username.value.trim();
+  let email=userEmail.value.trim();
+  let typeVal=type.value;
+  let weightVal=parseFloat(weight.value);
+  let phoneVal=phone.value;
+  let latVal=latitude.value;
+  let lngVal=longitude.value;
+  let imgInput=image;
+
+  if(!name||!email||!typeVal||!weightVal||!phoneVal||!latVal||!lngVal||imgInput.files.length===0){
+    alert("Fill all fields"); return;
+  }
+
+  let commission=(weightVal*getPrice(typeVal)*0.12).toFixed(2);
+  let data=JSON.parse(localStorage.getItem("recycleData"))||[];
+
+  // Check if user already exists
+  let existing=data.find(d=>d.email===email);
+  let points=existing ? existing.points+10 : 10;
+
+  let reader=new FileReader();
+  reader.onload=function(){
+    data.push({id:Date.now(),name:name,email:email,type:typeVal,weight:weightVal,commission:commission,points:points,image:reader.result});
+    localStorage.setItem("recycleData",JSON.stringify(data));
+    result.innerHTML=`✅ Submitted! You earned ${points} points.`;
+    username.value=""; userEmail.value=""; type.value=""; weight.value=""; phone.value=""; image.value=""; latitude.value=""; longitude.value="";
+    loadAdmin(); loadCompany();
+  }
+  reader.readAsDataURL(imgInput.files[0]);
+}
+
+// Admin
+function checkAdmin(){
+  if(adminPass.value==="123456789"){ hideAll(); adminPage.classList.remove("hidden"); loadAdmin(); } 
+  else alert("Wrong Password");
+}
+function loadAdmin(){
+  let data=JSON.parse(localStorage.getItem("recycleData"))||[];
+  adminTable.innerHTML="";
+  data.forEach(item=>{
+    adminTable.innerHTML+=`<tr>
+      <td>${item.name}</td>
+      <td>${item.email}</td>
+      <td>${item.type}</td>
+      <td>${item.weight}</td>
+      <td>${item.commission}</td>
+      <td>${item.points}</td>
+      <td><button class="delete-btn" onclick="deleteItem(${item.id})">Delete</button></td>
+    </tr>`;
+  });
+}
+
+// Company
+function checkCompany(){
+  if(companyPass.value==="12345"){ hideAll(); companyPage.classList.remove("hidden"); loadCompany(); } 
+  else alert("Wrong Password");
+}
+function loadCompany(){
+  let data=JSON.parse(localStorage.getItem("recycleData"))||[];
+  let summary={plastic:0,glass:0,metal:0,paper:0};
+  data.forEach(d=>{ if(summary[d.type]!==undefined) summary[d.type]+=parseFloat(d.weight); });
+  companyTable.innerHTML="";
+  for(let type in summary){
+    let kg=summary[type];
+    if(kg>0){ let value=(kg*getPrice(type)).toFixed(2);
+      companyTable.innerHTML+=`<tr><td>${type}</td><td>${kg} KG</td><td>${value} EGP</td></tr>`;
+    }
+  }
+}
+
+// Delete
+function deleteItem(id){
+  let data=JSON.parse(localStorage.getItem("recycleData"))||[];
+  data=data.filter(d=>d.id!==id);
+  localStorage.setItem("recycleData",JSON.stringify(data));
+  loadAdmin(); loadCompany();
+}
+function logout(){ location.reload(); }
+</script>
+
+<script>
+// Background particles
+const canvas=document.getElementById('bgCanvas'), ctx=canvas.getContext('2d');
+canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+const particles=[];
+for(let i=0;i<80;i++){ particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,dx:(Math.random()-0.5)*0.5,dy:(Math.random()-0.5)*0.5}); }
+function animate(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  particles.forEach(p=>{
+    p.x+=p.dx; p.y+=p.dy;
+    if(p.x>canvas.width)p.x=0; if(p.x<0)p.x=canvas.width;
+    if(p.y>canvas.height)p.y=0; if(p.y<0)p.y=canvas.height;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fillStyle='#39ff14'; ctx.fill();
+  });
+  requestAnimationFrame(animate);
+}
+animate();
+window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
+</script>
+
+</body>
+</html>
